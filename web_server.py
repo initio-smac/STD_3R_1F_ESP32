@@ -171,8 +171,12 @@ def http_get(url, https=True):
 @app.route("/restart")
 def restart(req, resp):
     print("restarting")
-    config.update_config_variable(key="mode", value=0 )
-    import machine
+    if req.method == "POST":
+        yield from req.read_form_data()
+    else:  # GET, apparently
+        req.parse_qs()
+    mode = req.form.get("mode", 0)
+    config.update_config_variable(key="mode", value=mode )
     machine.reset()
 
 @app.route("/download_update")
@@ -187,6 +191,7 @@ def download_update(req, resp):
     config.delete_config_variable(key="download_version")
     yield from picoweb.start_response(resp)
     yield from resp.awrite("Updates installed. Restarting")
+    config.update_config_variable(key="mode", value=0)
     machine.reset()
 
 @app.route("/check_for_update")
@@ -206,4 +211,11 @@ def check_for_update(req, resp):
 
 #import _thread
 #_thread.start_new_thread(mqttTest.connect, ())
+download_software = config.get_config_variable(key="download_software")
+print("download-software", download_software)
+if download_software == 1:
+    config.delete_config_variable(key="download_software")
+    ota.check_and_install_udpates()
+
+
 app.run(debug=True, host=ADDR)
